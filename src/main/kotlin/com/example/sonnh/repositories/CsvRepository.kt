@@ -28,29 +28,21 @@ class CsvRepository {
     }
 
     fun upsertRow(tableName: String, row: RowObject, keys: Set<String>) {
+        if (isRowExists(tableName, row, keys)) {
 
-//        if (keys.isEmpty()) {
-//            return
-//        }
-//
-//        if (isRowExists(tableName, row, keys)) {
-//
-//        } else {
-//
-//        }
+        } else {
+
+        }
     }
 
     private fun isRowExists(tableName: String, row: RowObject, tableKeys: Set<String>): Boolean {
-        var result = false
-//        var query = StringBuilder()
-//        query.append("SELECT count(id) FROM \"$tableName\"")
-//        query.append(" WHERE")
-//        tableKeys.forEach {
-//            query.append("$it = ${row.fin}")
-//        }
-//        query.append(" ")
-//        query.deleteCharAt(query.lastIndexOf(","))
-
-        return result
+        val query = StringBuilder()
+        query.append("SELECT count(id) FROM \"$tableName\"")
+        query.append(" WHERE")
+        tableKeys.forEachIndexed { index, key ->
+            query.append(" $key = ${row.value}${if (index != (tableKeys.size - 1)) "," else ""}")
+        }
+        val result: Int = entityManager.createNativeQuery(query.toString()).singleResult as Int
+        return result > 0
     }
 }
