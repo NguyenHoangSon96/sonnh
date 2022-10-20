@@ -1,7 +1,6 @@
 package com.example.sonnh.services
 
 import com.example.sonnh.repositories.CsvRepository
-import lombok.extern.log4j.Log4j
 import org.apache.commons.io.FileUtils
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
@@ -9,7 +8,6 @@ import org.springframework.stereotype.Service
 import org.springframework.web.multipart.MultipartFile
 import java.nio.charset.Charset
 import javax.transaction.Transactional
-import kotlin.reflect.jvm.internal.impl.descriptors.Visibilities.Public
 
 @Service
 @Transactional
@@ -25,11 +23,12 @@ class CsvService {
         if (name.isNullOrEmpty() || !name.endsWith("csv") || keys.isEmpty()) {
             return
         }
+        //todo use file reader of kotlin
         val filePath = FileUtils.getFile("src/main/resources/temp/$name")
         FileUtils.writeByteArrayToFile(filePath, file.bytes)
 
         val contents = FileUtils.readLines(filePath, Charset.defaultCharset())
-        val firstLineList = contents[0].split(",")
+        val firstLineList = contents[0].replace("?", "").replace("(", "").replace(")", "").split(",")
         val columns = firstLineList.toSet()
         if (firstLineList.size != columns.size) {
             throw Exception("Column is duplicated")
@@ -37,35 +36,26 @@ class CsvService {
 
         val tableName = name.replace(".csv", "").lowercase().replace(" ", "_")
         val tableKeys = keys.map { it.lowercase().replace(" ", "_") }.toSet()
-        val tableColumns = columns.map {
-            it.lowercase()
-                .replace(" ", "_")
-                .replace("?", "")
-                .replace("(", "")
-                .replace(")", "")
-        }.toSet()
+        val tableColumns = columns.map { it.lowercase().replace(" ", "_") }.toSet()
         csvRepository.createDynamicTable(tableName, tableKeys.toSet(), tableColumns.toSet())
 
         // row to map
-        val rows = mutableListOf<RowObject>()
+        var rowMaps = mutableListOf<Map<String, Any>>()
         for ((i, line) in contents.withIndex()) {
+            val rows = line.split(",")
             if (i == 0) continue
-            val values = line.split(",")
-            for ((j, columnDisplayName) in columns.withIndex()) {
-                val columnName = columnDisplayName.lowercase().replace(" ", "_")
-                val value = values[j]
-                rows.add(RowObject(columnName, columnDisplayName, value));
+            val rowMap = mutableMapOf<String, Any>()
+            tableColumns.forEachIndexed { index, tableColumn ->
+                rowMap[tableColumn] = rows[index]
             }
+            rowMaps.add(rowMap)
         }
-        log.info(rows.toString())
 
-        for ((index, row) in rows.withIndex()) {
-            csvRepository.upsertRow(tableName, row, tableKeys)
+        for (rowMap in rowMaps) {
+            csvRepository.upsertRow(tableName, rowMap, tableKeys)
         }
 
 
     }
 
 }
-
-data class RowObject(var columnName: String, var columnDisplayName: String, var value: String)
